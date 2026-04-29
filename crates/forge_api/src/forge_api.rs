@@ -21,6 +21,73 @@ use url::Url;
 
 use crate::API;
 
+/// Helper trait for branch service methods on ForgeAPI.
+/// This trait is implemented by ForgeAPI when used with ForgeServices.
+/// Helper trait for branch service methods on ForgeAPI.
+/// This trait is implemented by ForgeAPI when used with ForgeServices.
+#[async_trait::async_trait]
+pub trait BranchServiceMethods {
+    async fn create_branch_impl(
+        &self,
+        name: &str,
+        task: &str,
+        agent_id: Option<AgentId>,
+    ) -> Result<Branch>;
+    async fn switch_branch_impl(&self, name: &str) -> Result<()>;
+    async fn list_branches_impl(&self) -> Result<Vec<BranchInfo>>;
+    async fn merge_branch_impl(&self, name: &str, delete_after: bool) -> Result<MergeResult>;
+    async fn delete_branch_impl(&self, name: &str) -> Result<()>;
+    async fn abandon_branch_impl(&self, name: &str) -> Result<()>;
+    async fn get_active_branch_impl(&self) -> Result<Option<String>>;
+}
+
+#[async_trait::async_trait]
+impl BranchServiceMethods
+    for ForgeAPI<ForgeServices<ForgeRepo<ForgeInfra>>, ForgeRepo<ForgeInfra>>
+{
+    async fn create_branch_impl(
+        &self,
+        name: &str,
+        task: &str,
+        agent_id: Option<AgentId>,
+    ) -> Result<Branch> {
+        self.services
+            .branch_service()
+            .create_branch(name, task, agent_id)
+            .await
+    }
+
+    async fn switch_branch_impl(&self, name: &str) -> Result<()> {
+        self.services.branch_service().switch_branch(name).await
+    }
+
+    async fn list_branches_impl(&self) -> Result<Vec<BranchInfo>> {
+        self.services.branch_service().list_branches().await
+    }
+
+    async fn merge_branch_impl(&self, name: &str, delete_after: bool) -> Result<MergeResult> {
+        self.services
+            .branch_service()
+            .merge_branch(name, delete_after)
+            .await
+    }
+
+    async fn delete_branch_impl(&self, name: &str) -> Result<()> {
+        self.services
+            .branch_service()
+            .delete_branch(name, true)
+            .await
+    }
+
+    async fn abandon_branch_impl(&self, name: &str) -> Result<()> {
+        self.services.branch_service().abandon_branch(name).await
+    }
+
+    async fn get_active_branch_impl(&self) -> Result<Option<String>> {
+        self.services.branch_service().get_active_branch().await
+    }
+}
+
 pub struct ForgeAPI<S, F> {
     services: Arc<S>,
     infra: Arc<F>,
@@ -69,6 +136,8 @@ impl<
         + SkillRepository
         + GrpcInfra,
 > API for ForgeAPI<A, F>
+where
+    Self: BranchServiceMethods,
 {
     async fn discover(&self) -> Result<Vec<File>> {
         let environment = self.services.get_environment();
@@ -433,6 +502,41 @@ impl<
     async fn mcp_auth_status(&self, server_url: &str) -> Result<String> {
         let env = self.services.get_environment().clone();
         Ok(forge_infra::mcp_auth_status(server_url, &env).await)
+    }
+
+    // Branch management methods
+
+    async fn create_branch(
+        &self,
+        name: &str,
+        task: &str,
+        agent_id: Option<AgentId>,
+    ) -> Result<Branch> {
+        self.create_branch_impl(name, task, agent_id).await
+    }
+
+    async fn switch_branch(&self, name: &str) -> Result<()> {
+        self.switch_branch_impl(name).await
+    }
+
+    async fn list_branches(&self) -> Result<Vec<BranchInfo>> {
+        self.list_branches_impl().await
+    }
+
+    async fn merge_branch(&self, name: &str, delete_after: bool) -> Result<MergeResult> {
+        self.merge_branch_impl(name, delete_after).await
+    }
+
+    async fn delete_branch(&self, name: &str) -> Result<()> {
+        self.delete_branch_impl(name).await
+    }
+
+    async fn abandon_branch(&self, name: &str) -> Result<()> {
+        self.abandon_branch_impl(name).await
+    }
+
+    async fn get_active_branch(&self) -> Result<Option<String>> {
+        self.get_active_branch_impl().await
     }
 
     fn hydrate_channel(&self) -> Result<()> {

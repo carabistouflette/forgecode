@@ -697,6 +697,29 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                 }
                 return Ok(());
             }
+            TopLevelCommand::Branch(branch_group) => {
+                match branch_group.command {
+                    crate::cli::BranchCommand::Create { name, task, agent: _ } => {
+                        self.on_branch_create(name, task).await?;
+                    }
+                    crate::cli::BranchCommand::Switch { name } => {
+                        self.on_branch_switch(name).await?;
+                    }
+                    crate::cli::BranchCommand::Merge { name, delete } => {
+                        self.on_branch_merge(name, delete).await?;
+                    }
+                    crate::cli::BranchCommand::Delete { name } => {
+                        self.on_branch_delete(name).await?;
+                    }
+                    crate::cli::BranchCommand::List => {
+                        self.on_branch_list().await?;
+                    }
+                    crate::cli::BranchCommand::Status => {
+                        self.on_branch_status().await?;
+                    }
+                }
+                return Ok(());
+            }
             TopLevelCommand::Commit(commit_group) => {
                 self.init_state(false).await?;
                 let preview = commit_group.preview;
@@ -2267,10 +2290,182 @@ impl<A: API + ConsoleWriter + 'static, F: Fn(ForgeConfig) -> A + Send + Sync> UI
                 let cwd = self.state.cwd.clone();
                 self.on_workspace_init(cwd, false).await?;
             }
+            AppCommand::BranchCreate { name, task } => {
+                self.on_branch_create(name, task).await?;
+            }
+            AppCommand::BranchSwitch { name } => {
+                self.on_branch_switch(name).await?;
+            }
+            AppCommand::BranchMerge { name, delete } => {
+                self.on_branch_merge(name, delete).await?;
+            }
+            AppCommand::BranchDelete { name } => {
+                self.on_branch_delete(name).await?;
+            }
+            AppCommand::BranchList => {
+                self.on_branch_list().await?;
+            }
+            AppCommand::BranchStatus => {
+                self.on_branch_status().await?;
+            }
         }
 
         Ok(false)
     }
+
+    // Branch management handlers
+
+    async fn on_branch_create(&mut self, name: String, task: String) -> anyhow::Result<()> {
+        self.spinner.start(Some("Creating branch..."))?;
+        let result = self.api.create_branch(&name, &task, None).await;
+        self.spinner.stop(None)?;
+
+        match result {
+            Ok(branch) => {
+                self.writeln_title(TitleFormat::info(format!(
+                    "Branch '{}' created with task: {}",
+                    branch.name, branch.task
+                )))?;
+            }
+            Err(e) => {
+                self.writeln_title(TitleFormat::error(format!(
+                    "Failed to create branch: {}",
+                    e
+                )))?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn on_branch_switch(&mut self, name: String) -> anyhow::Result<()> {
+        self.spinner.start(Some("Switching branch..."))?;
+        let result = self.api.switch_branch(&name).await;
+        self.spinner.stop(None)?;
+
+        match result {
+            Ok(()) => {
+                self.writeln_title(TitleFormat::info(format!("Switched to branch '{}'", name)))?;
+            }
+            Err(e) => {
+                self.writeln_title(TitleFormat::error(format!(
+                    "Failed to switch branch: {}",
+                    e
+                )))?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn on_branch_merge(&mut self, name: String, delete: bool) -> anyhow::Result<()> {
+        self.spinner.start(Some("Merging branch..."))?;
+        let result = self.api.merge_branch(&name, delete).await;
+        self.spinner.stop(None)?;
+
+        match result {
+            Ok(merge_result) => {
+                if merge_result.success {
+                    let msg = if delete {
+                        format!("Branch '{}' merged and deleted", name)
+                    } else {
+                        format!("Branch '{}' merged", name)
+                    };
+                    self.writeln_title(TitleFormat::info(msg))?;
+                } else {
+                    self.writeln_title(TitleFormat::error(format!(
+                        "Merge failed: {}",
+                        merge_result.message
+                    )))?;
+                }
+            }
+            Err(e) => {
+                self.writeln_title(TitleFormat::error(format!("Failed to merge branch: {}", e)))?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn on_branch_delete(&mut self, name: String) -> anyhow::Result<()> {
+        self.spinner.start(Some("Deleting branch..."))?;
+        let result = self.api.delete_branch(&name).await;
+        self.spinner.stop(None)?;
+
+        match result {
+            Ok(()) => {
+                self.writeln_title(TitleFormat::info(format!("Branch '{}' deleted", name)))?;
+            }
+            Err(e) => {
+                self.writeln_title(TitleFormat::error(format!(
+                    "Failed to delete branch: {}",
+                    e
+                )))?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn on_branch_list(&mut self) -> anyhow::Result<()> {
+        let branches = self.api.list_branches().await?;
+
+        if branches.is_empty() {
+            self.writeln_title(TitleFormat::info("No branches found".to_string()))?;
+            return Ok(());
+        }
+
+        let mut info = Info::new().add_title("BRANCHES");
+        for branch in branches {
+            let status = match branch.status {
+                forge_domain::BranchStatus::Active => "Active",
+                forge_domain::BranchStatus::Merged => "Merged",
+                forge_domain::BranchStatus::Abandoned => "Abandoned",
+            };
+            let changes = if branch.has_changes { "Yes" } else { "No" };
+            info = info
+                .add_title(branch.name.clone())
+                .add_key_value("Task", &branch.task)
+                .add_key_value("Status", status)
+                .add_key_value("Has Changes", changes);
+        }
+        self.writeln(info)?;
+        Ok(())
+    }
+
+    async fn on_branch_status(&mut self) -> anyhow::Result<()> {
+        let branches = self.api.list_branches().await?;
+        let active_branch = self.api.get_active_branch().await?;
+
+        if branches.is_empty() {
+            self.writeln_title(TitleFormat::info("No branches found".to_string()))?;
+            return Ok(());
+        }
+
+        let mut info = Info::new().add_title("BRANCH STATUS");
+        if let Some(active) = active_branch {
+            info = info.add_key_value("Active Branch", &active);
+        }
+
+        let active_count = branches
+            .iter()
+            .filter(|b| b.status == forge_domain::BranchStatus::Active)
+            .count();
+        let merged_count = branches
+            .iter()
+            .filter(|b| b.status == forge_domain::BranchStatus::Merged)
+            .count();
+        let abandoned_count = branches
+            .iter()
+            .filter(|b| b.status == forge_domain::BranchStatus::Abandoned)
+            .count();
+
+        info = info
+            .add_key_value("Total Branches", branches.len().to_string())
+            .add_key_value("Active", active_count.to_string())
+            .add_key_value("Merged", merged_count.to_string())
+            .add_key_value("Abandoned", abandoned_count.to_string());
+
+        self.writeln(info)?;
+        Ok(())
+    }
+
     async fn on_compaction(&mut self) -> Result<(), anyhow::Error> {
         let conversation_id = self.init_conversation().await?;
         let compaction_result = self.api.compact_conversation(&conversation_id).await?;

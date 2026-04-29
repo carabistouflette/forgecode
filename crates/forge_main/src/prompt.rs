@@ -17,6 +17,7 @@ const MULTILINE_INDICATOR: &str = "::: ";
 // Nerd font symbols — left prompt
 const DIR_SYMBOL: &str = "\u{ea83}"; // 󪃃  folder icon
 const BRANCH_SYMBOL: &str = "\u{f418}"; //   branch icon
+const WORK_SYMBOL: &str = "\u{ea5a}"; // 󪕚 work directory icon
 const SUCCESS_SYMBOL: &str = "\u{f013e}"; // 󰄾  chevron
 
 // Nerd font symbols — right prompt (ZSH rprompt)
@@ -42,6 +43,8 @@ pub struct ForgePrompt {
     /// suppressed (see [`ForgePrompt::render_prompt_right`]).
     pub reasoning_effort: Option<Effort>,
     pub git_branch: Option<String>,
+    /// Active branch name (when working in a managed branch with work directory)
+    pub active_branch: Option<String>,
 }
 
 impl ForgePrompt {
@@ -56,6 +59,7 @@ impl ForgePrompt {
             model: None,
             reasoning_effort: None,
             git_branch,
+            active_branch: None,
         }
     }
 
@@ -109,6 +113,17 @@ impl Prompt for ForgePrompt {
                 result,
                 " {}",
                 branch_style.paint(format!("{BRANCH_SYMBOL} {branch}"))
+            )
+            .unwrap();
+        }
+
+        // Managed branch work directory — shows when in a managed branch context
+        // Example: "work/feat-auth"
+        if let Some(branch) = &self.active_branch {
+            write!(
+                result,
+                " {}",
+                branch_style.paint(format!("{WORK_SYMBOL} {branch}"))
             )
             .unwrap();
         }
@@ -287,6 +302,7 @@ mod tests {
                 model: None,
                 reasoning_effort: None,
                 git_branch: None,
+                active_branch: None,
             }
         }
     }

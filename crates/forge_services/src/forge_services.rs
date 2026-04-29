@@ -15,6 +15,7 @@ use crate::agent_registry::ForgeAgentRegistryService;
 use crate::app_config::ForgeAppConfigService;
 use crate::attachment::ForgeChatRequest;
 use crate::auth::ForgeAuthService;
+use crate::branch::BranchService;
 use crate::command::CommandLoaderService as ForgeCommandLoaderService;
 use crate::conversation::ForgeConversationService;
 use crate::discovery::ForgeDiscoveryService;
@@ -82,6 +83,7 @@ pub struct ForgeServices<
     provider_auth_service: ForgeProviderAuthService<F>,
     workspace_service: Arc<crate::context_engine::ForgeWorkspaceService<F, FdDefault<F>>>,
     skill_service: Arc<ForgeSkillFetch<F>>,
+    branch_service: BranchService<F>,
     infra: Arc<F>,
 }
 
@@ -141,6 +143,11 @@ impl<
         ));
         let skill_service = Arc::new(ForgeSkillFetch::new(infra.clone()));
 
+        // Initialize branch service with forge directory
+        let cwd = infra.get_environment().cwd;
+        let forge_dir = cwd.join(".forge");
+        let branch_service = BranchService::new(infra.clone(), forge_dir);
+
         Self {
             conversation_service,
             attachment_service,
@@ -168,9 +175,15 @@ impl<
             provider_auth_service,
             workspace_service,
             skill_service,
+            branch_service,
             chat_service,
             infra,
         }
+    }
+
+    /// Get a reference to the branch service
+    pub fn branch_service(&self) -> &BranchService<F> {
+        &self.branch_service
     }
 }
 

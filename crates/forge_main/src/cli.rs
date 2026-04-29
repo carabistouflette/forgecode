@@ -133,6 +133,9 @@ pub enum TopLevelCommand {
     /// Manage workspaces for semantic search.
     Workspace(WorkspaceCommandGroup),
 
+    /// Manage feature branches for parallel development.
+    Branch(BranchCommandGroup),
+
     /// Process JSONL data through LLM with schema-constrained tools.
     Data(DataCommandGroup),
 
@@ -296,6 +299,63 @@ pub enum WorkspaceCommand {
         #[arg(short = 'y', long)]
         yes: bool,
     },
+}
+
+/// Command group for branch management.
+#[derive(Parser, Debug, Clone)]
+pub struct BranchCommandGroup {
+    #[command(subcommand)]
+    pub command: BranchCommand,
+
+    /// Output in machine-readable format.
+    #[arg(long, global = true)]
+    pub porcelain: bool,
+}
+
+/// Branch management commands.
+#[derive(Subcommand, Debug, Clone)]
+pub enum BranchCommand {
+    /// Create a new feature branch with work directory.
+    Create {
+        /// Branch name (e.g., feat/user-auth)
+        name: String,
+
+        /// Task description for this branch.
+        #[arg(long)]
+        task: String,
+
+        /// Agent to assign to this branch.
+        #[arg(long)]
+        agent: Option<AgentId>,
+    },
+
+    /// List all managed branches.
+    List,
+
+    /// Switch to a branch.
+    Switch {
+        /// Branch name to switch to.
+        name: String,
+    },
+
+    /// Merge a branch back to the main branch.
+    Merge {
+        /// Branch name to merge.
+        name: String,
+
+        /// Delete branch after successful merge.
+        #[arg(long)]
+        delete: bool,
+    },
+
+    /// Delete a branch and its work directory.
+    Delete {
+        /// Branch name to delete.
+        name: String,
+    },
+
+    /// Show status of all branches.
+    Status,
 }
 
 /// Command group for listing resources.
