@@ -689,6 +689,56 @@ pub enum AppCommand {
     /// Index the current workspace for semantic code search
     #[strum(props(usage = "Index the current workspace for semantic search"))]
     Index,
+
+    /// Create a new feature branch
+    #[strum(props(
+        usage = "Create a new feature branch: :branch-create <name> --task <description>"
+    ))]
+    #[command(name = "branch-create")]
+    BranchCreate {
+        /// Branch name
+        name: String,
+        /// Task description
+        #[arg(long)]
+        task: String,
+    },
+
+    /// Switch to a branch
+    #[strum(props(usage = "Switch to a branch: :branch-switch <name>"))]
+    #[command(name = "branch-switch")]
+    BranchSwitch {
+        /// Branch name
+        name: String,
+    },
+
+    /// Merge a branch back to main
+    #[strum(props(usage = "Merge a branch: :branch-merge <name> [--delete]"))]
+    #[command(name = "branch-merge")]
+    BranchMerge {
+        /// Branch name
+        name: String,
+        /// Delete branch after merge
+        #[arg(long)]
+        delete: bool,
+    },
+
+    /// Delete a branch
+    #[strum(props(usage = "Delete a branch: :branch-delete <name>"))]
+    #[command(name = "branch-delete")]
+    BranchDelete {
+        /// Branch name
+        name: String,
+    },
+
+    /// List all branches
+    #[strum(props(usage = "List all branches: :branch-list"))]
+    #[command(name = "branch-list")]
+    BranchList,
+
+    /// Show branch status
+    #[strum(props(usage = "Show branch status: :branch-status"))]
+    #[command(name = "branch-status")]
+    BranchStatus,
 }
 
 impl AppCommand {
@@ -739,6 +789,12 @@ impl AppCommand {
             AppCommand::WorkspaceStatus => "workspace-status",
             AppCommand::WorkspaceInfo => "workspace-info",
             AppCommand::WorkspaceInit => "workspace-init",
+            AppCommand::BranchCreate { .. } => "branch-create",
+            AppCommand::BranchSwitch { .. } => "branch-switch",
+            AppCommand::BranchMerge { .. } => "branch-merge",
+            AppCommand::BranchDelete { .. } => "branch-delete",
+            AppCommand::BranchList => "branch-list",
+            AppCommand::BranchStatus => "branch-status",
         }
     }
 

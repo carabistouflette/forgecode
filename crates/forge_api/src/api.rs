@@ -260,4 +260,46 @@ pub trait API: Sync + Send {
 
     /// Check the OAuth authentication status of an MCP server
     async fn mcp_auth_status(&self, server_url: &str) -> Result<String>;
+
+    // Branch management methods (only available for ForgeServices)
+
+    /// Create a new feature branch with work directory
+    async fn create_branch(
+        &self,
+        _name: &str,
+        _task: &str,
+        _agent_id: Option<AgentId>,
+    ) -> Result<Branch> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// Switch to a branch
+    async fn switch_branch(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// List all managed branches
+    async fn list_branches(&self) -> Result<Vec<BranchInfo>> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// Merge a branch back to main
+    async fn merge_branch(&self, _name: &str, _delete_after: bool) -> Result<MergeResult> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// Delete a branch
+    async fn delete_branch(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// Abandon a branch (mark as abandoned without deleting)
+    async fn abandon_branch(&self, _name: &str) -> Result<()> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
+
+    /// Get the currently active branch name
+    async fn get_active_branch(&self) -> Result<Option<String>> {
+        anyhow::bail!("Branch management not available for this API implementation")
+    }
 }
